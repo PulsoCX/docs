@@ -1,33 +1,58 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API reference"
+description: "One endpoint, three outbound channels."
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+The Pulso API exposes a single public endpoint: `POST /v1/conversations`. It accepts a `pulsoVersionId`, a `channel`, and the channel-specific destination, and returns the freshly created conversation. Everything else (identity, the conversational AI, the analysis pipeline, action execution, notifications) happens inside the platform; the integrator only needs to trigger it.
 
-## Welcome
+## Base URL
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
-
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+https://api.pulso.cx
+```
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+Every request requires an API key issued from the Pulso console, sent as a Bearer token:
+
+```
+Authorization: Bearer pk_live_...
+```
+
+Keys are scoped per tenant. The endpoint documented here requires the `conversations:write` scope. Missing or expired keys produce `401 UNAUTHORIZED`; keys without the right scope produce `403 FORBIDDEN`.
+
+## Errors
+
+Errors follow a stable shape:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "statusCode": 422,
+  "code": "VALIDATION_ERROR",
+  "message": "channel=whatsapp requires channelMetadata.phoneE164 in E.164 format",
+  "timestamp": "2026-05-15T07:03:25.264Z",
+  "path": "/v1/conversations"
+}
 ```
+
+Use `code` for control flow; `message` is human-oriented and may change between releases.
+
+| Status | Code               | Meaning                                                                 |
+| ------ | ------------------ | ----------------------------------------------------------------------- |
+| 401    | `UNAUTHORIZED`     | Bearer token is missing, malformed, or revoked.                         |
+| 403    | `FORBIDDEN`        | The API key is valid but lacks the required scope.                      |
+| 404    | `NOT_FOUND`        | The `pulsoVersionId` does not exist or belongs to a different tenant.   |
+| 422    | `VALIDATION_ERROR` | The body failed schema validation (missing `phoneE164`, wrong channel). |
+| 5xx    | `INTERNAL_ERROR`   | Transient platform error; safe to retry with backoff.                   |
+
+## Idempotency
+
+`POST /v1/conversations` is not idempotent at the request level: a retry with the same body creates a fresh conversation. Idempotency is enforced one layer down (the action plan and individual action executions are deduplicated by natural keys), so the integrator should not retry the trigger on transient network errors unless creating duplicate conversations is acceptable.
+
+## Try it
+
+Each endpoint page includes a "Try it" panel powered by the OpenAPI spec. Fire a real conversation from the docs against `https://api.pulso.cx` using your tenant's API key.
+
+<Card title="Start a conversation" icon="paper-plane" href="/api-reference/endpoint/start-conversation">
+  `POST /v1/conversations` — the one endpoint that runs the demo end-to-end.
+</Card>

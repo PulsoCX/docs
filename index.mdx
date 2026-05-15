@@ -1,133 +1,41 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
-icon: 'star'
+title: "Pulso"
+description: "Conversational CX measurement. Companies trigger a conversation, an AI agent talks to the customer over the right channel, and the platform turns the dialogue into structured insight and downstream actions."
+icon: "wave-pulse"
 ---
 
-## Setting up
+## What Pulso does
 
-Get your documentation site up and running in minutes.
+Pulso is a SaaS that replaces traditional satisfaction surveys with a conversation. A company (the `tenant`) defines a "moment of truth" once (for example: "the customer just downgraded from Premium", "we just delivered the product", "the support ticket was closed last week") and Pulso reaches the customer through the channel of choice with a tailored conversation, runs an AI agent that adapts in real time, analyzes the transcript, and triggers downstream actions on the tenant's stack.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+The integration surface is intentionally narrow: a single REST endpoint starts a conversation, and the platform takes care of identity, channels, AI behavior, analysis and execution.
 
-## Make it yours
+## How a conversation flows
 
-Design a docs site that looks great and empowers your users.
+1. The integrator POSTs to `https://api.pulso.cx/v1/conversations` with the `pulsoVersionId`, the `channel`, and the customer-specific payload (`phoneE164` or `email`).
+2. Pulso creates the conversation row and dispatches the outbound action based on the channel:
+   - **Phone**: an outbound Twilio call. The AI agent speaks in real time over the line with full-duplex audio.
+   - **Email**: a transactional invitation with a signed link to `chat.pulso.cx`. The customer answers on the web chat without re-identifying themselves.
+   - **WhatsApp**: the approved `pulso_es` template via Meta Cloud API. The customer answers in WhatsApp and the agent replies in the same thread.
+3. The conversation runs until the agent decides it has enough signal or the budget (turns or minutes) is exhausted.
+4. The analysis pipeline scores the transcript against the tags defined in the `pulsoVersion` and produces an action plan.
+5. The action tools attached to the Pulso fire: CRM updates via Composio, signed webhooks to custom MCP endpoints, follow-up emails to the tenant.
+
+## Where to go next
 
 <Columns cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Three `curl` snippets, one per channel, to trigger your first conversation.
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
+    title="API reference"
     icon="terminal"
     href="/api-reference/introduction"
   >
-    Auto-generate API documentation from OpenAPI specifications.
+    Authentication, base URL, error format, and the one endpoint you need.
   </Card>
 </Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Make your content agent ready
-
-Make your docs work for humans and AI agents alike.
-
-<Columns cols={2}>
-  <Card
-    title="Prompt component"
-    icon="robot"
-    href="/agent-ready/prompt"
-  >
-    Embed shareable AI prompts readers can copy or open in Cursor.
-  </Card>
-  <Card
-    title="Visibility"
-    icon="eye"
-    href="/agent-ready/visibility"
-  >
-    Show different content to humans and agents reading your docs.
-  </Card>
-  <Card
-    title="Contextual menu"
-    icon="bolt"
-    href="/agent-ready/contextual"
-  >
-    Give readers one-click access to Claude, ChatGPT, Cursor, and more.
-  </Card>
-  <Card
-    title="AI coding tools"
-    icon="wand-magic-sparkles"
-    href="/ai-tools/claude-code"
-  >
-    Set up Claude Code, Cursor, or Windsurf with Mintlify's skill.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>

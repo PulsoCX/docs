@@ -1,216 +1,233 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.3",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
-    "version": "1.0.0"
+    "title": "Pulso API",
+    "description": "Pulso is a conversational CX measurement platform. The integrator triggers a conversation by posting to a single endpoint and Pulso reaches the customer through the chosen channel: phone (outbound Twilio call), email (transactional invitation with a signed link to the web chat), or whatsapp (approved `pulso_es` template). The AI agent runs the conversation, the analysis pipeline scores it, and the configured action tools fire when the action plan triggers them.\n\n## Authentication\n\nEvery request requires an API key issued from the Pulso console, sent as a Bearer token:\n\n```\nAuthorization: Bearer pk_live_...\n```\n\nThe key is scoped per tenant. The endpoint documented here needs `conversations:write`.\n\n## Base URL\n\nProduction: `https://api.pulso.cx`\n\nErrors follow the shape `{ statusCode, code, message, timestamp, path }` and use the standard HTTP status codes (`401 UNAUTHORIZED` when the bearer token is missing or invalid, `403 FORBIDDEN` when the key lacks the scope, `422 VALIDATION_ERROR` when the payload fails schema validation).",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Pulso",
+      "url": "https://pulso.cx",
+      "email": "team@pulso.cx"
+    }
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://api.pulso.cx",
+      "description": "Production"
     }
   ],
   "security": [
     {
-      "bearerAuth": []
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Conversations",
+      "description": "Start an AI-driven conversation on any supported channel."
     }
   ],
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
+    "/v1/conversations": {
+      "post": {
+        "tags": ["Conversations"],
+        "summary": "Start a conversation",
+        "description": "Creates a new conversation row, resolves the customer identity, and triggers the appropriate outbound action based on the requested `channel`:\n\n- `phone`: places an outbound Twilio call to `channelMetadata.phoneE164`. The agent speaks in real time over the call.\n- `email`: sends a transactional invitation via SES to `channelMetadata.email`. The mail contains a signed link to `chat.pulso.cx/p/{shareSlug}?ct=...` (TTL 7 days) so the customer answers on the web chat without re-identifying themselves.\n- `whatsapp`: sends the approved `pulso_es` template via Meta Cloud API to `channelMetadata.phoneE164`. The customer answers in WhatsApp and the agent replies in the same thread.\n- `web`: not exposed via the public API. Web conversations start when the customer opens `chat.pulso.cx/p/{shareSlug}` directly.\n\nThe response returns the `conversationId` immediately; the outbound side effect (call, email, template) runs asynchronously through the event bus, so the same idempotency rules apply: a retry with the same payload creates a fresh conversation, it does not deduplicate.",
+        "operationId": "startConversation",
+        "security": [
           {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
+            "BearerAuth": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConversationRequest"
+              },
+              "examples": {
+                "phone": {
+                  "summary": "Outbound phone call",
+                  "value": {
+                    "pulsoVersionId": "1f915ea6-04b2-4232-884d-ccfb1773cf9a",
+                    "channel": "phone",
+                    "channelMetadata": {
+                      "phoneE164": "+56982959775"
+                    }
+                  }
+                },
+                "email": {
+                  "summary": "Email invitation with a signed link to the web chat",
+                  "value": {
+                    "pulsoVersionId": "1f915ea6-04b2-4232-884d-ccfb1773cf9a",
+                    "channel": "email",
+                    "channelMetadata": {
+                      "email": "maria@example.com"
+                    }
+                  }
+                },
+                "whatsapp": {
+                  "summary": "WhatsApp template (pulso_es)",
+                  "value": {
+                    "pulsoVersionId": "1f915ea6-04b2-4232-884d-ccfb1773cf9a",
+                    "channel": "whatsapp",
+                    "channelMetadata": {
+                      "phoneE164": "+56982959775"
+                    }
                   }
                 }
               }
             }
-          },
-          "400": {
-            "description": "Unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "Creates a new plant in the store",
-        "requestBody": {
-          "description": "Plant to add to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Plant"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
-        "requestBody": {
-          "description": "Plant added to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
           }
         },
         "responses": {
-          "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
+          "201": {
+            "description": "Conversation created and outbound action scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartConversationResponse"
+                },
+                "example": {
+                  "conversationId": "54956fe0-2613-42bc-8708-839ee500f228",
+                  "startedAt": "2026-05-15T07:03:25.264Z"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key is missing the `conversations:write` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Payload failed schema validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     }
   },
   "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
-          }
-        }
-      },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          }
-        ]
-      },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key issued from the Pulso console. Send as `Authorization: Bearer <key>`."
       }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
+    "schemas": {
+      "Channel": {
+        "type": "string",
+        "enum": ["phone", "email", "whatsapp"],
+        "description": "Outbound channel. `web` is reserved for direct shareSlug links and is not exposed via the public API."
+      },
+      "ChannelMetadata": {
+        "type": "object",
+        "description": "Channel-specific payload. `phoneE164` is required for `phone` and `whatsapp`; `email` is required for `email`.",
+        "properties": {
+          "phoneE164": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$",
+            "description": "Destination phone in E.164 format (leading `+`, country code, no spaces). Required for `phone` and `whatsapp`.",
+            "example": "+56982959775"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Destination email address. Required for `email`. The platform upserts a client row keyed by `(tenantId, emailHash)` before scheduling the invitation, so subsequent conversations with the same address reuse the same identity.",
+            "example": "maria@example.com"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartConversationRequest": {
+        "type": "object",
+        "required": ["pulsoVersionId", "channel"],
+        "properties": {
+          "pulsoVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the published `pulsoVersion` to run. Look it up in the Pulso console (`/pulsos/{id}` shows the live version id).",
+            "example": "1f915ea6-04b2-4232-884d-ccfb1773cf9a"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Optional pre-resolved client id. When omitted, Pulso resolves identity from `channelMetadata` (upsert by email for `email`; deterministic phone hash lookup for `whatsapp`).",
+            "nullable": true
+          },
+          "channelMetadata": {
+            "$ref": "#/components/schemas/ChannelMetadata"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartConversationResponse": {
+        "type": "object",
+        "required": ["conversationId", "startedAt"],
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the freshly created conversation. Use it to correlate the outbound side effect (Twilio call SID, SES MessageId, Meta wamid) with the analysis and action plan downstream."
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server-side timestamp when the conversation row was persisted."
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["statusCode", "code", "message"],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "description": "HTTP status code mirrored in the body."
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code (e.g. `UNAUTHORIZED`, `VALIDATION_ERROR`)."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable explanation. Do not parse; use `code` for control flow."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "path": {
+            "type": "string",
+            "description": "Request path that produced the error."
+          }
+        }
       }
     }
   }
